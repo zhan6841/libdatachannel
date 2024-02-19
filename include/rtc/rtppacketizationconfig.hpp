@@ -23,6 +23,8 @@ public:
 	uint8_t payloadType;
 	uint32_t clockRate;
 	uint8_t videoOrientationId;
+	// Abs Send Time Extension Header
+	uint8_t absSendTimeId;
 
 	// current sequence number
 	uint16_t sequenceNumber;
@@ -69,7 +71,7 @@ public:
 	/// nullopt)
 	/// @param videoOrientationId Video orientation (see above)
 	RtpPacketizationConfig(SSRC ssrc, std::string cname, uint8_t payloadType, uint32_t clockRate,
-	                       uint8_t videoOrientationId = 0);
+	                       uint8_t videoOrientationId = 0, uint8_t absSendTimeId = 0);
 
 	RtpPacketizationConfig(const RtpPacketizationConfig &) = delete;
 

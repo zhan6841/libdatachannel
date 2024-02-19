@@ -13,6 +13,18 @@
 #include <cmath>
 #include <cstring>
 
+namespace {
+
+// TODO: move to utils
+uint64_t ntp_time() {
+	const auto now = std::chrono::system_clock::now();
+	const double secs = std::chrono::duration<double>(now.time_since_epoch()).count();
+	// Assume the epoch is 01/01/1970 and adds the number of seconds between 1900 and 1970
+	return uint64_t(std::floor((secs + 2208988800.) * double(uint64_t(1) << 32)));
+}
+
+} // namespace
+
 namespace rtc {
 
 RtpPacketizer::RtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig) : rtpConfig(rtpConfig) {}
@@ -28,8 +40,13 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 	                              mark &&
 	                              (rtpConfig->videoOrientation != 0);
 
+	const bool setAbsSendTime = (rtpConfig->absSendTimeId != 0);
+	
 	if (setVideoRotation)
 		rtpExtHeaderSize += 2;
+
+	if (setAbsSendTime)
+	    rtpExtHeaderSize += (1 + sizeof(uint32_t) - 1);
 
 	if (rtpConfig->mid.has_value())
 		rtpExtHeaderSize += (1 + rtpConfig->mid->length());
@@ -69,6 +86,19 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 			extHeader->writeCurrentVideoOrientation(offset, rtpConfig->videoOrientationId,
 			                                        rtpConfig->videoOrientation);
 			offset += 2;
+		}
+
+		// https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/abs-send-time
+		if (setAbsSendTime) {
+			uint64_t ntpTime = ntp_time();
+			uint32_t ntpTimestamp = ntpTime >> 14;
+			std::byte nb[3];
+			nb[0] = (std::byte)((ntpTimestamp & 0x00FF0000) >> 16);
+			nb[1] = (std::byte)((ntpTimestamp & 0x0000FF00) >> 8);
+			nb[2] = (std::byte)(ntpTimestamp & 0x000000FF);
+			extHeader->writeOneByteHeader(offset, rtpConfig->absSendTimeId,
+			    nb, sizeof(uint32_t) - 1);
+			offset += (1 + sizeof(uint32_t) - 1);
 		}
 
 		if (rtpConfig->mid.has_value()) {
