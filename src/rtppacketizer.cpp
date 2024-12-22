@@ -96,7 +96,7 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 		// https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/abs-send-time
 		if (setAbsSendTime) {
 			uint64_t ntpTime = ntp_time();
-			uint32_t ntpTimestamp = ntpTime >> 14;
+			uint32_t ntpTimestamp = (uint32_t)(ntpTime >> 14);
 			std::byte nb[3];
 			nb[0] = (std::byte)((ntpTimestamp & 0x00FF0000) >> 16);
 			nb[1] = (std::byte)((ntpTimestamp & 0x0000FF00) >> 8);
