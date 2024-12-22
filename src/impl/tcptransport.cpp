@@ -69,7 +69,7 @@ TcpTransport::TcpTransport(socket_t sock, state_callback callback)
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
 	if (::getpeername(mSock, reinterpret_cast<struct sockaddr *>(&addr), &addrlen) < 0)
-		throw std::runtime_error("getsockname failed");
+		throw std::runtime_error("getpeername failed");
 
 	unmap_inet6_v4mapped(reinterpret_cast<struct sockaddr *>(&addr), &addrlen);
 
@@ -200,23 +200,23 @@ void TcpTransport::resolve() {
 }
 
 void TcpTransport::attempt() {
-	std::lock_guard lock(mSendMutex);
-
-	if (state() != State::Connecting)
-		return; // Cancelled
-
-	if (mSock == INVALID_SOCKET) {
-		::closesocket(mSock);
-		mSock = INVALID_SOCKET;
-	}
-
-	if (mResolved.empty()) {
-		PLOG_WARNING << "Connection to " << mHostname << ":" << mService << " failed";
-		changeState(State::Failed);
-		return;
-	}
-
 	try {
+		std::lock_guard lock(mSendMutex);
+
+		if (state() != State::Connecting)
+			return; // Cancelled
+
+		if (mSock == INVALID_SOCKET) {
+			::closesocket(mSock);
+			mSock = INVALID_SOCKET;
+		}
+
+		if (mResolved.empty()) {
+			PLOG_WARNING << "Connection to " << mHostname << ":" << mService << " failed";
+			changeState(State::Failed);
+			return;
+		}
+
 		auto [addr, addrlen] = mResolved.front();
 		mResolved.pop_front();
 

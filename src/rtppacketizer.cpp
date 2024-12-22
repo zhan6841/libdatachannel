@@ -45,6 +45,11 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 	if (setVideoRotation)
 		rtpExtHeaderSize += 2;
 
+	const bool setPlayoutDelay = (rtpConfig->playoutDelayId > 0 && rtpConfig->playoutDelayId < 15);
+
+	if (setPlayoutDelay)
+		rtpExtHeaderSize += 4;
+  
 	if (setAbsSendTime)
 	    rtpExtHeaderSize += (1 + sizeof(uint32_t) - 1);
 
@@ -91,7 +96,7 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 		// https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/abs-send-time
 		if (setAbsSendTime) {
 			uint64_t ntpTime = ntp_time();
-			uint32_t ntpTimestamp = ntpTime >> 14;
+			uint32_t ntpTimestamp = (uint32_t)(ntpTime >> 14);
 			std::byte nb[3];
 			nb[0] = (std::byte)((ntpTimestamp & 0x00FF0000) >> 16);
 			nb[1] = (std::byte)((ntpTimestamp & 0x0000FF00) >> 8);
@@ -114,6 +119,21 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 			    offset, rtpConfig->ridId,
 			    reinterpret_cast<const std::byte *>(rtpConfig->rid->c_str()),
 			    rtpConfig->rid->length());
+		}
+
+		if (setPlayoutDelay) {
+			uint16_t min = rtpConfig->playoutDelayMin & 0xFFF;
+			uint16_t max = rtpConfig->playoutDelayMax & 0xFFF;
+
+			// 12 bits for min + 12 bits for max
+			byte data[] = {
+				byte((min >> 4) & 0xFF), 
+				byte(((min & 0xF) << 4) | ((max >> 8) & 0xF)),
+				byte(max & 0xFF)
+			};
+
+			extHeader->writeOneByteHeader(offset, rtpConfig->playoutDelayId, data, 3);
+			offset += 4;
 		}
 	}
 
